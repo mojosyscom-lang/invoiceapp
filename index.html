@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <style>
+        :root { --primary: #28a745; --secondary: #6c757d; --bg: #f4f7f6; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
+        h2 { margin-top: 0; color: #333; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        .flex-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 16px; }
+        .btn-add { background: #007bff; padding: 8px; margin-bottom: 20px; }
+        .btn-save { background: var(--primary); }
+        .btn-print { background: var(--secondary); }
+        .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
+        .nav-tabs button { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; background: white; }
+        .active-tab { background: #333 !important; color: white !important; }
+        .history-item { border-bottom: 1px solid #eee; padding: 12px 0; }
+        
+        /* Print Styles */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; padding: 0; }
+            .card { box-shadow: none; border: none; width: 100%; max-width: 100%; }
+            input { border: none; background: transparent; }
+            .item-row input { font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="nav-tabs no-print">
+        <button id="tabCreate" class="active-tab" onclick="showSection('create')">Create</button>
+        <button id="tabHistory" onclick="showSection('history')">History</button>
+    </div>
+
+    <div id="createSection" class="card">
+        <div class="flex-row" style="justify-content: space-between; align-items: center;">
+            <h2>Invoice</h2>
+            <div style="text-align: right;">
+                <small>ID: <span id="invNum"></span></small><br>
+                <small id="currentDate"></small>
+            </div>
+        </div>
+
+        <input type="text" id="clientName" placeholder="Client Name" required>
+        <hr>
+
+        <div id="itemsList">
+            </div>
+
+        <button type="button" class="btn btn-add no-print" onclick="addItem()">+ Add Item</button>
+
+        <div style="text-align: right; font-size: 1.2em; margin-bottom: 20px;">
+            <strong>Total: $<span id="totalDisplay">0.00</span></strong>
+        </div>
+
+        <button class="btn btn-save no-print" onclick="saveInvoice()">Save & Sync</button>
+        <button class="btn btn-print no-print" onclick="window.print()">Print / PDF</button>
+    </div>
+
+    <div id="historySection" class="card" style="display:none;">
+        <h2>History</h2>
+        <input type="text" id="searchBar" placeholder="Search by client..." oninput="renderHistory()">
+        <div id="historyList"></div>
+        <button class="btn" style="background:#dc3545; font-size: 12px;" onclick="clearHistory()">Clear All History</button>
+    </div>
+
+    <script>
+        // 1. Initial Setup
+        const invId = "INV-" + Date.now().toString().slice(-6);
+        document.getElementById('invNum').innerText = invId;
+        document.getElementById('currentDate').innerText = new Date().toLocaleDateString();
+
+        function showSection(section) {
+            document.getElementById('createSection').style.display = section === 'create' ? 'block' : 'none';
+            document.getElementById('historySection').style.display = section === 'history' ? 'block' : 'none';
+            document.getElementById('tabCreate').className = section === 'create' ? 'active-tab' : '';
+            document.getElementById('tabHistory').className = section === 'history' ? 'active-tab' : '';
+            if(section === 'history') renderHistory();
+        }
+
+        // 2. Item Management
+        function addItem() {
+            const div = document.createElement('div');
+            div.className = 'flex-row item-row';
+            div.innerHTML = `
+                <input type="text" placeholder="Item" style="flex: 2;">
+                <input type="number" placeholder="Rate" class="rate" style="flex: 1;" oninput="updateTotal()">
+            `;
+            document.getElementById('itemsList').appendChild(div);
+        }
+
+        function updateTotal() {
+            const rates = document.querySelectorAll('.rate');
+            let total = 0;
+            rates.forEach(r => total += parseFloat(r.value || 0));
+            document.getElementById('totalDisplay').innerText = total.toFixed(2);
+        }
+
+        // 3. Data Handling
+        async function saveInvoice() {
+            const client = document.getElementById('clientName').value;
+            const total = document.getElementById('totalDisplay').innerText;
+            if(!client) return alert("Please enter a client name");
+
+            const newInvoice = {
+                id: document.getElementById('invNum').innerText,
+                date: document.getElementById('currentDate').innerText,
+                client: client,
+                amount: total
+            };
+
+            // Save to Local Storage
+            let history = JSON.parse(localStorage.getItem('invoiceHistory')) || [];
+            history.unshift(newInvoice);
+            localStorage.setItem('invoiceHistory', JSON.stringify(history));
+
+            // Sync to Google Sheets
+            const scriptURL = 'https://script.google.com/macros/s/AKfycbxaSy-VKLITAJQnKC1GHjPTJV3agav3XFs5uKLP-Btw360jm5C6AZs0FRpa9P3XL_iMsg/exec'; 
+            try {
+                await fetch(scriptURL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(newInvoice)
+                });
+                alert("Success! Saved locally and synced to Sheets.");
+            } catch (e) {
+                alert("Saved locally! (Offline: Will not show in Sheets until online)");
+            }
+        }
+
+        function renderHistory() {
+            const query = document.getElementById('searchBar').value.toLowerCase();
+            const container = document.getElementById('historyList');
+            const history = JSON.parse(localStorage.getItem('invoiceHistory')) || [];
+            
+            const filtered = history.filter(i => i.client.toLowerCase().includes(query));
+            
+            container.innerHTML = filtered.map(i => `
+                <div class="history-item">
+                    <strong>${i.id}</strong> - ${i.client}<br>
+                    <small>${i.date} | <b>$${i.amount}</b></small>
+                </div>
+            `).join('') || "<p>No matches found.</p>";
+        }
+
+        function clearHistory() {
+            if(confirm("Delete all local records?")) {
+                localStorage.removeItem('invoiceHistory');
+                renderHistory();
+            }
+        }
+
+        // Initialize first item
+        addItem();
+
+        // PWA Service Worker Registration
+        if('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
+    </script>
+</body>
+</html>
