@@ -1,9 +1,9 @@
 {
-  "name": "Invoice Pro",
-  "short_name": "Invoicer",
+  "name": "Shiv Video Vision App",
+  "short_name": "Shiv Video",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#28a745",
-  "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/1048/1048953.png", "sizes": "512x512", "type": "image/png" }]
+  "icons": [{ "src": "IMG_7709.png", "sizes": "512x512", "type": "image/png" }]
 }
