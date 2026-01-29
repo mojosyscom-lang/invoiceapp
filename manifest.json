@@ -5,5 +5,5 @@
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#28a745",
-  "icons": [{ "src": "http://mojosyscom-lang.github.io/invoiceapp/IMG_7709.png", "sizes": "512x512", "type": "image/png" }]
+  "icons": [{ "src": "https://mojosyscom-lang.github.io/invoiceapp/IMG_7710.jpeg", "sizes": "502x502", "type": "image/jpeg" }]
 }
